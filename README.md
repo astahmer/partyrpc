@@ -5,7 +5,7 @@ better with typesafety.
 
 ## Install
 
-Not on npm yet.
+`pnpm i partyrpc`
 
 ## Usage
 
