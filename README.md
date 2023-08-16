@@ -1,6 +1,7 @@
 # partyrpc
 
-Move Fast (and Break Everything). Everything is better with typesafety.
+[Partykit](https://partykit.io/) + [RPC](https://trpc.io/) = PartyRPC Move Fast (and Break Everything). Everything is
+better with typesafety.
 
 ## Install
 
