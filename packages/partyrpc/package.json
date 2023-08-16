@@ -53,6 +53,7 @@
   "files": [
     "src",
     "dist",
+    "*.d.ts",
     "README.md"
   ],
   "sideEffects": false,
