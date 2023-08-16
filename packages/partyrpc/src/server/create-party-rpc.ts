@@ -25,8 +25,8 @@ const createAssert = <TSchema extends Schema>(schema: TSchema) => {
         ({ message, path }) =>
           new ValidationIssue(
             message,
-            path?.map(({ key }) => key)
-          )
+            path?.map(({ key }) => key),
+          ),
       ),
     };
   };
@@ -36,12 +36,10 @@ type TypedHandler<TSchema, Context> = (
   payload: TSchema,
   ws: PartyKitConnection,
   room: PartyKitRoom,
-  ctx: Context
+  ctx: Context,
 ) => void | Promise<void>;
 
-type CreateAssert<TSchema extends Schema> = (
-  schema: TSchema
-) => (data: unknown) => Promise<Infer<TSchema>>;
+type CreateAssert<TSchema extends Schema> = (schema: TSchema) => (data: unknown) => Promise<Infer<TSchema>>;
 
 type EventDefinition<TType, TSchema, Context> = {
   type: TType;
@@ -62,7 +60,7 @@ type EventMap<E, Context> = {
   [K in keyof E]: {
     schema: E[K];
     onMessage: Infer<E[K]> extends never | v.NeverSchema
-      ? TypedHandler<Pretty<{ type: K }>, Context>
+      ? TypedHandler<{ type: K }, Context>
       : TypedHandler<Pretty<Infer<E[K]> & { type: K }>, Context>;
   };
 };
@@ -70,8 +68,7 @@ type EventMap<E, Context> = {
 const decoder = new TextDecoder();
 const decode = <Payload = any>(payload: ArrayBuffer | string) => {
   try {
-    const data =
-      payload instanceof ArrayBuffer ? decoder.decode(payload) : payload;
+    const data = payload instanceof ArrayBuffer ? decoder.decode(payload) : payload;
     return JSON.parse(data) as Payload;
   } catch (err) {
     return;
@@ -84,15 +81,15 @@ type NoMatchingRouteResponse = {
   type: "ws.error";
   reason: "no matching route";
 };
+type UnexpectedErrorResponse = { type: "ws.error"; reason: "unexpected error" };
 type BasePartyResponses =
   | EmptyMessageResponse
   | InvalidMessageResponse
-  | NoMatchingRouteResponse;
+  | NoMatchingRouteResponse
+  | UnexpectedErrorResponse;
 
 export const createPartyRpc = <Context, Responses>() => {
-  function createEventsHandler<const TEvents>(
-    events: EventMap<TEvents, Context>
-  ) {
+  function createEventsHandler<const TEvents>(events: EventMap<TEvents, Context>) {
     const eventEntries = Object.entries(events).map(([type, item]) => {
       const event = item as EventDefinition<keyof TEvents, any, Context>;
       return [
@@ -105,19 +102,11 @@ export const createPartyRpc = <Context, Responses>() => {
         },
       ] as [typeof type, typeof event];
     });
-    const eventsMap = new Map<
-      keyof TEvents,
-      EventDefinition<keyof TEvents, any, Context>
-    >(eventEntries as any);
+    const eventsMap = new Map<keyof TEvents, EventDefinition<keyof TEvents, any, Context>>(eventEntries as any);
     const types = Object.keys(events) as Array<keyof TEvents>;
     const withType = v.object({ type: v.enumType(types as any) });
 
-    async function onMessage(
-      message: string | ArrayBuffer,
-      ws: PartyKitConnection,
-      room: PartyKitRoom,
-      ctx: Context
-    ) {
+    async function onMessage(message: string | ArrayBuffer, ws: PartyKitConnection, room: PartyKitRoom, ctx: Context) {
       const decoded = decode<unknown>(message);
 
       if (!decoded) {
@@ -134,34 +123,29 @@ export const createPartyRpc = <Context, Responses>() => {
         return send(ws, { type: "ws.error", reason: "no matching route" });
       }
 
-      const payload = parsed.data;
-      await route.assert(payload);
-      return route.onMessage(payload as { type: keyof TEvents }, ws, room, ctx);
+      // so that we keep extra properties from the schema
+      const payload = decoded;
+      try {
+        await route.assert(payload);
+        return route.onMessage(payload as { type: keyof TEvents }, ws, room, ctx);
+      } catch (err) {
+        return send(ws, { type: "ws.error", reason: "unexpected error" });
+      }
     }
 
     return {
       onMessage,
       events: Object.fromEntries(eventEntries) as unknown as {
-        [EventKey in keyof TEvents]: EventDefinition<
-          EventKey,
-          TEvents[EventKey],
-          Context
-        >;
+        [EventKey in keyof TEvents]: EventDefinition<EventKey, TEvents[EventKey], Context>;
       },
       responses: {} as Responses,
       __events: events,
     };
   }
 
-  const send = (
-    ws: PartyKitConnection,
-    payload: BasePartyResponses | Responses
-  ) => ws.send(JSON.stringify(payload));
+  const send = (ws: PartyKitConnection, payload: BasePartyResponses | Responses) => ws.send(JSON.stringify(payload));
 
-  return { events: createEventsHandler, send } satisfies CreatePartyRpc<
-    Context,
-    Responses
-  >;
+  return { events: createEventsHandler, send } satisfies CreatePartyRpc<Context, Responses>;
 };
 
 // prevent TS issues when generating dts such as:
@@ -173,20 +157,13 @@ export type CreatePartyRpc<Context, Responses> = {
       message: string | ArrayBuffer,
       ws: PartyKitConnection,
       room: PartyKitRoom,
-      ctx: Context
+      ctx: Context,
     ) => Promise<void>;
     events: {
-      [EventKey in keyof TEvents]: EventDefinition<
-        EventKey,
-        TEvents[EventKey],
-        Context
-      >;
+      [EventKey in keyof TEvents]: EventDefinition<EventKey, TEvents[EventKey], Context>;
     };
     responses: Responses;
     __events: EventMap<TEvents, Context>;
   };
-  send: (
-    ws: PartyKitConnection,
-    payload: BasePartyResponses | Responses
-  ) => void;
+  send: (ws: PartyKitConnection, payload: BasePartyResponses | Responses) => void;
 };

@@ -1,0 +1,22 @@
+{
+  "name": "@partykit/examples-basic",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "start": "partykit dev --var A=456 B=789=123 --define SOME_GLOBAL=88888"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "partykit": "0.0.0-1f86d17",
+    "partyrpc": "workspace:^",
+    "partysocket": "0.0.0-e57200d",
+    "valibot": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.0"
+  }
+}
