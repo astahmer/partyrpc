@@ -26,25 +26,25 @@ type CounterResponse = { type: "counter"; counter: number };
 
 type PartyResponses = PongResponse | LatencyResponse | CounterResponse;
 
-const party = createPartyRpc<Context, PartyResponses>();
+const party = createPartyRpc<PartyResponses, Context>();
 
 export const safeParty = party.events({
   ping: {
     schema: v.never(),
-    onMessage(payload, ws, room, ctx) {
+    onMessage(message, ws, room, ctx) {
       party.send(ws, { type: "pong", size: room.connections.size });
     },
   },
   latency: {
     schema: v.object({ id: v.string() }),
-    onMessage(payload, ws, room, ctx) {
-      party.send(ws, { type: "latency", id: payload.id });
+    onMessage(message, ws, room, ctx) {
+      party.send(ws, { type: "latency", id: message.id });
     },
   },
   "add-to-counter": {
     schema: v.object({ amount: v.number() }),
-    onMessage(payload, ws, room, ctx) {
-      ctx.counter += payload.amount;
+    onMessage(message, ws, room, ctx) {
+      ctx.counter += message.amount;
       party.send(ws, { type: "counter", counter: ctx.counter });
     },
   },
@@ -123,25 +123,33 @@ client.send({ type: "add-to-counter" }); // ❌ error, 'amount' is declared here
 
 You can also hook to typesafe events (only react atm).
 
-- `usePartyEvent` is a hook that will trigger your callback whenever a message of a given type is received.
+- `usePartyMessage` is a hook that will trigger your callback whenever a message of a given type is received.
 - that callback will always have the latest state of your component, thanks to a
   [`useEvent`](https://github.com/scottrippey/react-use-event-hook) hook.
-- `usePartyEvent` doesn't add any event listener to the socket, it really just hooks into the client's message handler
+- `usePartyMessage` doesn't add any event listener to the socket, it really just hooks into the client's message handler
 
 ```ts
 // src/clients.ts
 import { createPartyHooks } from "partyrpc/react";
-const { usePartyEvent } = createPartyHooks(client);
+const { usePartyMessage, useSocketEvent } = createPartyHooks(client);
 
 function App() {
   const [count, setCount] = useState(0);
 
-  usePartyEvent("counter", (msg) => {
+  usePartyMessage("counter", (msg) => {
     console.log("received counter", msg);
     // msg is typed as CounterResponse, defined above as { type: "counter"; counter: number }
 
     console.log({ count });
     // count is always up to date, thanks to a useEvent hook
+  });
+
+  useSocketEvent("open", () => {
+    console.log("socket opened");
+  });
+
+  useSocketEvent("close", () => {
+    console.log("socket closed");
   });
 
   // ...

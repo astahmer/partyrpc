@@ -8,25 +8,25 @@ type CounterResponse = { type: "counter"; counter: number };
 
 type PartyResponses = PongResponse | LatencyResponse | CounterResponse;
 
-const party = createPartyRpc<Context, PartyResponses>();
+const party = createPartyRpc<PartyResponses, Context>();
 
 export const safeParty = party.events({
   ping: {
     schema: v.never(),
-    onMessage(payload, ws, room, ctx) {
+    onMessage(message, ws, room, ctx) {
       party.send(ws, { type: "pong", size: room.connections.size });
     },
   },
   latency: {
     schema: v.object({ id: v.string() }),
-    onMessage(payload, ws, room, ctx) {
-      party.send(ws, { type: "latency", id: payload.id });
+    onMessage(message, ws, room, ctx) {
+      party.send(ws, { type: "latency", id: message.id });
     },
   },
   "add-to-counter": {
     schema: v.object({ amount: v.number() }),
-    onMessage(payload, ws, room, ctx) {
-      ctx.counter += payload.amount;
+    onMessage(message, ws, room, ctx) {
+      ctx.counter += message.amount;
       party.send(ws, { type: "counter", counter: ctx.counter });
     },
   },

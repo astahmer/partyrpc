@@ -33,7 +33,7 @@ const createAssert = <TSchema extends Schema>(schema: TSchema) => {
 };
 
 type TypedHandler<TSchema, Context> = (
-  payload: TSchema,
+  message: TSchema,
   ws: PartyKitConnection,
   room: PartyKitRoom,
   ctx: Context,
@@ -66,10 +66,10 @@ type EventMap<E, Context> = {
 };
 
 const decoder = new TextDecoder();
-const decode = <Payload = any>(payload: ArrayBuffer | string) => {
+const decode = <Message = any>(message: ArrayBuffer | string) => {
   try {
-    const data = payload instanceof ArrayBuffer ? decoder.decode(payload) : payload;
-    return JSON.parse(data) as Payload;
+    const data = message instanceof ArrayBuffer ? decoder.decode(message) : message;
+    return JSON.parse(data) as Message;
   } catch (err) {
     return;
   }
@@ -106,8 +106,8 @@ export const createPartyRpc = <Responses, Context = {}>() => {
     const types = Object.keys(events) as Array<keyof TEvents>;
     const withType = v.object({ type: v.enumType(types as any) });
 
-    async function onMessage(message: string | ArrayBuffer, ws: PartyKitConnection, room: PartyKitRoom, ctx: Context) {
-      const decoded = decode<unknown>(message);
+    async function onMessage(msg: string | ArrayBuffer, ws: PartyKitConnection, room: PartyKitRoom, ctx: Context) {
+      const decoded = decode<unknown>(msg);
 
       if (!decoded) {
         return send(ws, { type: "ws.error", reason: "empty message" });
@@ -124,10 +124,10 @@ export const createPartyRpc = <Responses, Context = {}>() => {
       }
 
       // so that we keep extra properties from the schema
-      const payload = decoded;
+      const message = decoded;
       try {
-        await route.assert(payload);
-        return route.onMessage(payload as { type: keyof TEvents }, ws, room, ctx);
+        await route.assert(message);
+        return route.onMessage(message as { type: keyof TEvents }, ws, room, ctx);
       } catch (err) {
         return send(ws, { type: "ws.error", reason: "unexpected error" });
       }
@@ -143,11 +143,11 @@ export const createPartyRpc = <Responses, Context = {}>() => {
     };
   }
 
-  const send = <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, payload: Message) =>
-    ws.send(JSON.stringify(payload));
+  const send = <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, message: Message) =>
+    ws.send(JSON.stringify(message));
 
-  const broadcast = <Message extends BasePartyResponses | Responses>(room: PartyKitRoom, payload: Message) =>
-    room.broadcast(JSON.stringify(payload));
+  const broadcast = <Message extends BasePartyResponses | Responses>(room: PartyKitRoom, message: Message) =>
+    room.broadcast(JSON.stringify(message));
 
   return { events: createEventsHandler, send, broadcast } satisfies CreatePartyRpc<Context, Responses>;
 };
@@ -169,6 +169,6 @@ export type CreatePartyRpc<Context, Responses> = {
     responses: Responses;
     __events: EventMap<TEvents, Context>;
   };
-  send: <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, payload: Message) => void;
-  broadcast: <Message extends BasePartyResponses | Responses>(room: PartyKitRoom, payload: Message) => void;
+  send: <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, message: Message) => void;
+  broadcast: <Message extends BasePartyResponses | Responses>(room: PartyKitRoom, message: Message) => void;
 };
