@@ -88,7 +88,7 @@ type BasePartyResponses =
   | NoMatchingRouteResponse
   | UnexpectedErrorResponse;
 
-export const createPartyRpc = <Context, Responses>() => {
+export const createPartyRpc = <Responses, Context = {}>() => {
   function createEventsHandler<const TEvents>(events: EventMap<TEvents, Context>) {
     const eventEntries = Object.entries(events).map(([type, item]) => {
       const event = item as EventDefinition<keyof TEvents, any, Context>;
@@ -143,9 +143,13 @@ export const createPartyRpc = <Context, Responses>() => {
     };
   }
 
-  const send = (ws: PartyKitConnection, payload: BasePartyResponses | Responses) => ws.send(JSON.stringify(payload));
+  const send = <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, payload: Message) =>
+    ws.send(JSON.stringify(payload));
 
-  return { events: createEventsHandler, send } satisfies CreatePartyRpc<Context, Responses>;
+  const broadcast = <Message extends BasePartyResponses | Responses>(room: PartyKitRoom, payload: Message) =>
+    room.broadcast(JSON.stringify(payload));
+
+  return { events: createEventsHandler, send, broadcast } satisfies CreatePartyRpc<Context, Responses>;
 };
 
 // prevent TS issues when generating dts such as:
@@ -165,5 +169,6 @@ export type CreatePartyRpc<Context, Responses> = {
     responses: Responses;
     __events: EventMap<TEvents, Context>;
   };
-  send: (ws: PartyKitConnection, payload: BasePartyResponses | Responses) => void;
+  send: <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, payload: Message) => void;
+  broadcast: <Message extends BasePartyResponses | Responses>(room: PartyKitRoom, payload: Message) => void;
 };
