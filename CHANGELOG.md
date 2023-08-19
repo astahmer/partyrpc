@@ -2,6 +2,75 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.0] - 2023-08-20
+
+### Added
+
+Added `create` identity fn to create typesafe messages and send them later. Available both on `createPartyRpc` and
+`createPartyClient`.
+
+```ts
+const p = createPartyRpc<PartyResponses>();
+
+const msg = p.create({
+  // typesafe message
+  type: "update",
+  id: websocket.id,
+  x: position.x,
+  y: position.y,
+  pointer: position.pointer,
+  country: attachment.country,
+});
+
+const { type, ...cursor } = msg;
+websocket.serializeAttachment(cursor); // use it however you want
+p.broadcast(room, msg, [websocket.id]); // send it later
+```
+
+---
+
+Added `options.debug` as string to only log what you need.
+
+```ts
+const client = createPartyClient<PartyEvents, PartyResponses>(socket, { debug: "sync" }); // will only log message with { type: "sync" }
+```
+
+---
+
+Expose `send` and `broadcast` helper fns on the return of `createPartyRpc().events()` so that you only need to export
+this one
+
+```ts
+const p = createPartyRpc<PartyResponses>(); // no need to export p anymore !
+export const niceParty = p.events({
+  // ...
+});
+
+// ...
+niceParty.send(websocket, { ... });
+```
+
+---
+
+Expose `socket` on the return of `createPartyClient()`, same reason, so that you only need to export this one
+
+```ts
+const socket = new PartySocket({ host: envConfig.PARTYKIT_HOST, room: "main" });
+export const client = createPartyClient<PartyEvents, PartyResponses>(socket);
+
+client.socket; // new !
+```
+
+---
+
+Added the 3rd argument (`withoutIds`) to `createPartyRpc().broadcast()` to allow you to exclude some ids.
+
+### Changed
+
+Renamed `AnyResponse` type to `AnyResponseMessage` to be more explicit.
+
+---
+
 ## [0.1.0] - 2023-08-17
 
 ### Added
