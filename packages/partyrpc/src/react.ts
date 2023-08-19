@@ -1,1 +1,1 @@
-export * from "./react/use-party-event";
+export * from "./react/create-party-hooks";

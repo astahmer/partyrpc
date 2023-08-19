@@ -4,23 +4,37 @@ import type { AnyEventMap } from "../server/create-party-rpc";
 import { WebSocketEventMap } from "partysocket/ws";
 
 type Infer<TSchema> = TSchema extends v.BaseSchema ? v.Output<TSchema> : never;
-
 type Pretty<T> = { [K in keyof T]: T[K] } & {};
 
-export type AnyResponse = { type: string };
+export type AnyResponseMessage = { type: string };
 
-export function createPartyClient<Events extends AnyEventMap, Responses extends AnyResponse>(
+export function createPartyClient<TEvents extends AnyEventMap, TResponses extends AnyResponseMessage>(
   socket: PartySocket,
-  options?: { debug: boolean },
-): PartyClient<Events, Responses> {
-  function send<T extends keyof Events>(message: PartyEventByType<Events, T>) {
-    socket.send(JSON.stringify(message));
+  options?: { debug?: boolean | string },
+): PartyClient<TEvents, TResponses> {
+  const create: PartyClient<TEvents, TResponses>["create"] = (message) => message;
+  const send: PartyClient<TEvents, TResponses>["send"] = (message) => socket.send(JSON.stringify(message));
+
+  let debug: (type: keyof WebSocketEventMap, message?: AnyResponseMessage) => void = () => {};
+  const _debugValue = options?.debug;
+  if (_debugValue) {
+    if (typeof _debugValue === "string") {
+      debug = (type: keyof WebSocketEventMap, message?: AnyResponseMessage) => {
+        if (type === "message" && message) {
+          if (!message.type.startsWith(_debugValue)) return;
+        }
+
+        return console.log(`[party:${type}]`, message);
+      };
+    } else {
+      debug = (type: keyof WebSocketEventMap, message?: AnyResponseMessage) => console.log(`[party:${type}]`, message);
+    }
   }
 
-  const responsesListeners = new Map<string, Set<Function>>();
+  const responsesListeners: PartyClient<TEvents, TResponses>["responsesListeners"] = new Map();
   socket.addEventListener("message", (event: MessageEvent) => {
-    const message = JSON.parse(event.data) as Responses;
-    if (options?.debug) console.log("[party:message]", message);
+    const message = JSON.parse(event.data) as TResponses;
+    debug("message", message);
 
     const listeners = responsesListeners.get(message.type);
     if (!listeners) return;
@@ -30,10 +44,7 @@ export function createPartyClient<Events extends AnyEventMap, Responses extends 
     });
   });
 
-  const on = <TType extends Responses["type"]>(
-    type: TType,
-    callback: (response: PartyResponseByType<Responses, TType>) => void,
-  ) => {
+  const on: PartyClient<TEvents, TResponses>["on"] = (type, callback) => {
     const _type = type as string; // idk TS needs it
     if (!responsesListeners.has(_type)) {
       responsesListeners.set(_type, new Set());
@@ -47,10 +58,10 @@ export function createPartyClient<Events extends AnyEventMap, Responses extends 
     };
   };
 
-  const wsListeners = new Map<keyof WebSocketEventMap, Set<Function>>();
+  const wsListeners: PartyClient<TEvents, TResponses>["wsListeners"] = new Map();
   const makeEventListener = (type: keyof WebSocketEventMap): EventListener => {
     return (event) => {
-      if (options?.debug) console.log(`[party:${type}]`);
+      debug(type);
 
       const listeners = wsListeners.get(type);
       if (!listeners) return;
@@ -61,7 +72,7 @@ export function createPartyClient<Events extends AnyEventMap, Responses extends 
     };
   };
 
-  const onSocket = <TType extends keyof WebSocketEventMap>(type: TType, callback: (event: Event) => void) => {
+  const onSocket: PartyClient<TEvents, TResponses>["onSocket"] = (type, callback) => {
     if (!wsListeners.has(type)) {
       wsListeners.set(type, new Set());
     }
@@ -92,18 +103,21 @@ export function createPartyClient<Events extends AnyEventMap, Responses extends 
   };
 
   const client = {
+    socket,
+    create,
     send,
     on,
     onSocket,
     unsubscribe,
     wsListeners,
     responsesListeners,
-    _events: {} as Events,
-    _responses: {} as Responses,
+    _events: {} as TEvents,
+    _responses: {} as TResponses,
     // mostly for typechecking
-  } satisfies PartyClient<Events, Responses>;
+  } satisfies PartyClient<TEvents, TResponses>;
 
-  return client as PartyClient<Events, Responses>;
+  //  use as to return a pretty name
+  return client as PartyClient<TEvents, TResponses>;
 }
 
 export type PartyEventByType<Events extends AnyEventMap, TType extends keyof Events> = Events[TType]["schema"] extends
@@ -112,12 +126,14 @@ export type PartyEventByType<Events extends AnyEventMap, TType extends keyof Eve
   ? { type: TType }
   : Pretty<{ type: TType } & Infer<Events[TType]["schema"]>>;
 
-export type PartyResponseByType<TResponses extends AnyResponse, TType extends TResponses["type"]> = Extract<
+export type PartyResponseByType<TResponses extends AnyResponseMessage, TType extends TResponses["type"]> = Extract<
   TResponses,
   { type: TType }
 >;
 
-export type PartyClient<TEvents extends AnyEventMap, TResponses extends AnyResponse> = {
+export type PartyClient<TEvents extends AnyEventMap, TResponses extends AnyResponseMessage> = {
+  socket: PartySocket;
+  create: <T extends keyof TEvents>(message: PartyEventByType<TEvents, T>) => PartyEventByType<TEvents, T>;
   send: <T extends keyof TEvents>(message: PartyEventByType<TEvents, T>) => void;
   on: <TType extends TResponses["type"]>(
     type: TType,

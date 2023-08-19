@@ -4,7 +4,8 @@ import { PartyKitConnection, PartyKitRoom } from "partykit/server";
 
 type Pretty<T> = { [K in keyof T]: T[K] } & {};
 
-type Schema = v.AnySchema;
+// Compatiblity layer for the future migration to typeschema
+type Schema = v.BaseSchema;
 type Infer<TSchema> = TSchema extends v.BaseSchema ? v.Output<TSchema> : never;
 
 class ValidationIssue extends Error {
@@ -21,16 +22,18 @@ const createAssert = <TSchema extends Schema>(schema: TSchema) => {
     }
 
     return {
-      issues: result.error.issues.map(
-        ({ message, path }) =>
-          new ValidationIssue(
-            message,
-            path?.map(({ key }) => key),
-          ),
-      ),
+      _issues: result.error.issues.map(vIssuesToValidationIssues),
     };
   };
 };
+
+const vIssuesToValidationIssues = ({ message, path }: v.Issue) => {
+  return new ValidationIssue(
+    message,
+    path?.map(({ key }) => key),
+  );
+};
+//
 
 type TypedHandler<TSchema, Context> = (
   message: TSchema,
@@ -39,7 +42,11 @@ type TypedHandler<TSchema, Context> = (
   ctx: Context,
 ) => void | Promise<void>;
 
-type CreateAssert<TSchema extends Schema> = (schema: TSchema) => (data: unknown) => Promise<Infer<TSchema>>;
+type CreateAssert<TSchema extends Schema> = (
+  schema: TSchema,
+) => (data: unknown) => Promise<Infer<TSchema> | { _issues: ValidationIssue[] }>;
+
+type AssertReturn<TSchema> = Infer<TSchema> | { _issues: ValidationIssue[] };
 
 type EventDefinition<TType, TSchema, Context> = {
   type: TType;
@@ -76,7 +83,7 @@ const decode = <Message = any>(message: ArrayBuffer | string) => {
 };
 
 type EmptyMessageResponse = { type: "ws.error"; reason: "empty message" };
-type InvalidMessageResponse = { type: "ws.error"; reason: "invalid message" };
+type InvalidMessageResponse = { type: "ws.error"; reason: "invalid message"; _issues: ValidationIssue[] };
 type NoMatchingRouteResponse = {
   type: "ws.error";
   reason: "no matching route";
@@ -89,20 +96,25 @@ type BasePartyResponses =
   | UnexpectedErrorResponse;
 
 export const createPartyRpc = <Responses, Context = {}>() => {
+  const send: PartyResponseHelpers<Responses>["send"] = (ws, message) => ws.send(JSON.stringify(message));
+
+  const broadcast: PartyResponseHelpers<Responses>["broadcast"] = (room, message, without) =>
+    room.broadcast(JSON.stringify(message), without);
+
+  const create: PartyResponseHelpers<Responses>["create"] = (message) => {
+    return message;
+  };
+
   function createEventsHandler<const TEvents>(events: EventMap<TEvents, Context>) {
     const eventEntries = Object.entries(events).map(([type, item]) => {
       const event = item as EventDefinition<keyof TEvents, any, Context>;
-      return [
-        type,
-        {
-          type,
-          onMessage: event.onMessage,
-          schema: event.schema,
-          assert: createAssert(event.schema),
-        },
-      ] as [typeof type, typeof event];
+      return [type, { type, onMessage: event.onMessage, schema: event.schema, assert: createAssert(event.schema) }] as [
+        typeof type,
+        typeof event,
+      ];
     });
-    const eventsMap = new Map<keyof TEvents, EventDefinition<keyof TEvents, any, Context>>(eventEntries as any);
+
+    const eventsMap = new Map<keyof TEvents, EventDefinition<keyof TEvents, unknown, Context>>(eventEntries as any);
     const types = Object.keys(events) as Array<keyof TEvents>;
     const withType = v.object({ type: v.enumType(types as any) });
 
@@ -115,7 +127,11 @@ export const createPartyRpc = <Responses, Context = {}>() => {
 
       const parsed = v.safeParse(withType, decoded);
       if (!parsed.success) {
-        return send(ws, { type: "ws.error", reason: "invalid message" });
+        return send(ws, {
+          type: "ws.error",
+          reason: "invalid message",
+          _issues: parsed.error.issues.map(vIssuesToValidationIssues),
+        });
       }
 
       const route = eventsMap.get(parsed.data.type);
@@ -124,51 +140,55 @@ export const createPartyRpc = <Responses, Context = {}>() => {
       }
 
       // so that we keep extra properties from the schema
-      const message = decoded;
+      const message = decoded as { type: keyof TEvents };
       try {
-        await route.assert(message);
-        return route.onMessage(message as { type: keyof TEvents }, ws, room, ctx);
+        const result = (await route.assert(message)) as AssertReturn<unknown>;
+        if (typeof result === "object" && "issues" in result) {
+          return send(ws, { type: "ws.error", reason: "invalid message", _issues: result._issues });
+        }
+
+        return route.onMessage(message, ws, room, ctx);
       } catch (err) {
         return send(ws, { type: "ws.error", reason: "unexpected error" });
       }
     }
 
-    return {
-      onMessage,
-      events: Object.fromEntries(eventEntries) as unknown as {
-        [EventKey in keyof TEvents]: EventDefinition<EventKey, TEvents[EventKey], Context>;
-      },
-      responses: {} as Responses,
-      __events: events,
-    };
+    const eventDefs = Object.fromEntries(eventEntries) as unknown as EventDefinitionMap<TEvents, Context>;
+
+    return { send, broadcast, create, onMessage, events: eventDefs, responses: {} as Responses, __events: events };
   }
 
-  const send = <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, message: Message) =>
-    ws.send(JSON.stringify(message));
-
-  const broadcast = <Message extends BasePartyResponses | Responses>(room: PartyKitRoom, message: Message) =>
-    room.broadcast(JSON.stringify(message));
-
-  return { events: createEventsHandler, send, broadcast } satisfies CreatePartyRpc<Context, Responses>;
+  // use satifisies for typechecking, use as to return a pretty name
+  return { send, broadcast, create, events: createEventsHandler } satisfies CreatePartyRpc<
+    Responses,
+    Context
+  > as CreatePartyRpc<Responses, Context>;
 };
 
 // prevent TS issues when generating dts such as:
 // The inferred type of 'createPartyRpc' cannot be named without a reference to ...
 
-export type CreatePartyRpc<Context, Responses> = {
-  events: <const TEvents>(events: EventMap<TEvents, Context>) => {
-    onMessage: (
-      message: string | ArrayBuffer,
-      ws: PartyKitConnection,
-      room: PartyKitRoom,
-      ctx: Context,
-    ) => Promise<void>;
-    events: {
-      [EventKey in keyof TEvents]: EventDefinition<EventKey, TEvents[EventKey], Context>;
-    };
-    responses: Responses;
-    __events: EventMap<TEvents, Context>;
-  };
+export type PartyResponseHelpers<Responses> = {
   send: <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, message: Message) => void;
-  broadcast: <Message extends BasePartyResponses | Responses>(room: PartyKitRoom, message: Message) => void;
+  broadcast: <Message extends BasePartyResponses | Responses>(
+    room: PartyKitRoom,
+    message: Message,
+    without?: string[] | undefined,
+  ) => void;
+  create: <Message extends Responses | BasePartyResponses>(message: Message) => Message;
+};
+
+export type CreatePartyRpc<Responses, Context> = PartyResponseHelpers<Responses> & {
+  events: <const TEvents>(events: EventMap<TEvents, Context>) => PartyRpcEvents<TEvents, Responses, Context>;
+};
+
+type EventDefinitionMap<TEvents, Context> = {
+  [EventKey in keyof TEvents]: EventDefinition<EventKey, TEvents[EventKey], Context>;
+};
+
+export type PartyRpcEvents<TEvents, Responses, Context> = PartyResponseHelpers<Responses> & {
+  onMessage: (message: string | ArrayBuffer, ws: PartyKitConnection, room: PartyKitRoom, ctx: Context) => Promise<void>;
+  events: EventDefinitionMap<TEvents, Context>;
+  responses: Responses;
+  __events: EventMap<TEvents, Context>;
 };
