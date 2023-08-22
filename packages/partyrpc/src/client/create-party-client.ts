@@ -1,10 +1,9 @@
 import PartySocket from "partysocket";
 import * as v from "valibot";
 import type { AnyEventMap } from "../server/create-party-rpc";
-import { WebSocketEventMap } from "partysocket/ws";
-
-type Infer<TSchema> = TSchema extends v.BaseSchema ? v.Output<TSchema> : never;
-type Pretty<T> = { [K in keyof T]: T[K] } & {};
+import type { WebSocketEventMap } from "partysocket/ws";
+import type { Infer } from "../server/schema-assert";
+import { Pretty } from "../shared/utility.types";
 
 export type AnyResponseMessage = { type: string };
 
