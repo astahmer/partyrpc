@@ -51,7 +51,9 @@ type AssertReturn<TSchema> = Infer<TSchema> | { _issues: ValidationIssue[] };
 type EventDefinition<TType, TSchema, Context> = {
   type: TType;
   schema: TSchema;
-  onMessage: TSchema extends Schema
+  onMessage: TSchema extends v.NeverSchema
+    ? never
+    : TSchema extends Schema
     ? TypedHandler<Pretty<Infer<TSchema> & { type: TType }>, Context>
     : TypedHandler<{ type: TType }, Context>;
   assert: ReturnType<CreateAssert<TSchema extends Schema ? TSchema : Schema>>;
