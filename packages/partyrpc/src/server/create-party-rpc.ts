@@ -1,9 +1,8 @@
 import * as v from "valibot";
-
 import { PartyKitConnection, PartyKitRoom } from "partykit/server";
+import { EndpointDefinition, PartyFetchHandler, createFetchHandler, createRoute } from "./create-fetch-handler";
 import { AnySchema, Infer, createAssert, vIssuesToValidationIssues, ValidationIssue } from "./schema-assert";
-
-type Pretty<T> = { [K in keyof T]: T[K] } & {};
+import type { Pretty } from "../shared/utility.types";
 
 type TypedHandler<TSchema, Context> = (
   message: TSchema,
@@ -131,10 +130,14 @@ export const createPartyRpc = <Responses, Context = {}>() => {
   }
 
   // use satifisies for typechecking, use as to return a pretty name
-  return { send, broadcast, create, events: createEventsHandler } satisfies CreatePartyRpc<
-    Responses,
-    Context
-  > as CreatePartyRpc<Responses, Context>;
+  return {
+    send,
+    broadcast,
+    create,
+    events: createEventsHandler,
+    endpoints: createFetchHandler,
+    route: createRoute,
+  } satisfies CreatePartyRpc<Responses, Context> as CreatePartyRpc<Responses, Context>;
 };
 
 // prevent TS issues when generating dts such as:
@@ -152,6 +155,10 @@ export type PartyResponseHelpers<Responses> = {
 
 export type CreatePartyRpc<Responses, Context> = PartyResponseHelpers<Responses> & {
   events: <const TEvents>(events: EventMap<TEvents, Context>) => PartyRpcEvents<TEvents, Responses, Context>;
+  endpoints: <const TEndpoints extends readonly EndpointDefinition<unknown>[]>(
+    endpoints: TEndpoints,
+  ) => PartyFetchHandler<TEndpoints>;
+  route: <const TPath, TEndpoint extends EndpointDefinition<TPath>>(endpoint: TEndpoint) => TEndpoint;
 };
 
 type EventDefinitionMap<TEvents, Context> = {

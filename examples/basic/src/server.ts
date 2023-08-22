@@ -1,5 +1,5 @@
 import type { PartyKitServer } from "partykit/server";
-import { safeParty } from "./safe-party";
+import { router, safeParty } from "./safe-party";
 
 declare global {
   const SOME_GLOBAL: string;
@@ -18,41 +18,47 @@ export default {
     ws.addEventListener("message", (evt) => {
       safeParty.onMessage(evt.data, ws, room, ctx);
     });
+    console.trace();
   },
 
-  // onMessage(msg, conn, room) {
-  //   if (msg === "ping") {
-  //     conn.send(`pong:${room.connections.size}`);
-  //   } else if ((msg as string).startsWith("latency")) {
-  //     conn.send(msg);
-  //   }
+  // // onMessage(msg, conn, room) {
+  // //   if (msg === "ping") {
+  // //     conn.send(`pong:${room.connections.size}`);
+  // //   } else if ((msg as string).startsWith("latency")) {
+  // //     conn.send(msg);
+  // //   }
+  // // },
+
+  // // async onBeforeConnect(_req: Request) {
+  // //   return { x: 1 };
+  // // },
+
+  // async onBeforeRequest(req: Request) {
+  //   return new Request(req.url, {
+  //     headers: {
+  //       "x-foo": "bar",
+  //     },
+  //   });
   // },
+  // async onRequest(req: Request, room) {
+  //   console.log(room.env);
 
-  // async onBeforeConnect(_req: Request) {
-  //   return { x: 1 };
+  //   console.log(process.env["WHATUP"]);
+  //   console.log(room.parties);
+  //   // const res = await room.parties.xyz.get("some-id").fetch();
+  //   // console.log("gottt", await res.text());
+  //   const xyz = room.parties["xyz"]!;
+  //   const wssss = xyz.get("some-id").connect();
+  //   wssss.addEventListener("message", (evt) => {
+  //     console.log("got a message from xyz", evt.data);
+  //   });
+
+  //   console.log(SOME_GLOBAL);
+  //   return new Response("Hello world:" + req.headers.get("x-foo") + " " + room.id);
   // },
-
-  async onBeforeRequest(req: Request) {
-    return new Request(req.url, {
-      headers: {
-        "x-foo": "bar",
-      },
-    });
-  },
-  async onRequest(req: Request, room) {
-    console.log(room.env);
-
-    console.log(process.env["WHATUP"]);
-    console.log(room.parties);
-    // const res = await room.parties.xyz.get("some-id").fetch();
-    // console.log("gottt", await res.text());
-    const xyz = room.parties["xyz"]!;
-    const wssss = xyz.get("some-id").connect();
-    wssss.addEventListener("message", (evt) => {
-      console.log("got a message from xyz", evt.data);
-    });
-
-    console.log(SOME_GLOBAL);
-    return new Response("Hello world:" + req.headers.get("x-foo") + " " + room.id);
+  async unstable_onFetch(req, lobby, ctx) {
+    console.log("unstable_onFetch", req.url);
+    // return new Response("unstable_onFetch:" + req.url);
+    return router.onRequest(req, lobby, ctx);
   },
 } satisfies PartyKitServer;

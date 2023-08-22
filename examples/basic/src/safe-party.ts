@@ -9,6 +9,24 @@ type CounterResponse = { type: "counter"; counter: number };
 type PartyResponses = PongResponse | LatencyResponse | CounterResponse;
 
 const party = createPartyRpc<PartyResponses, Context>();
+export const router = party.endpoints([
+  party.route({
+    method: "post",
+    path: "/",
+    handler(req, lobby, ctx) {
+      return new Response("Hello world!");
+    },
+    response: v.object({ status: v.number(), body: v.string() }),
+  }),
+  party.route({
+    method: "get",
+    path: "/gaga",
+    handler(req, lobby, ctx) {
+      return new Response("azazazzaaz!");
+    },
+    response: v.object({ status: v.number(), body: v.string() }),
+  }),
+]);
 
 export const safeParty = party.events({
   ping: {

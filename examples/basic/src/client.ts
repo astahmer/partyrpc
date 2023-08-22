@@ -1,6 +1,6 @@
 import PartySocket from "partysocket";
-import { createPartyClient } from "partyrpc/client";
-import { SafePartyEvents, SafePartyResponses } from "./safe-party";
+import { createPartyClient, createApiClient } from "partyrpc/client";
+import { SafePartyEvents, SafePartyResponses, router } from "./safe-party";
 
 declare const PARTYKIT_HOST: string;
 
@@ -9,6 +9,9 @@ const partySocket = new PartySocket({
   room: "some-room",
 });
 const client = createPartyClient<SafePartyEvents, SafePartyResponses>(partySocket, { debug: true });
+const api = createApiClient(router.endpoints, (method, url, params) =>
+  fetch(url, { method }).then((res) => res.text()),
+).setBaseUrl("http://127.0.0.1:1999");
 
 const latencyPingStarts = new Map();
 
@@ -53,6 +56,25 @@ Object.assign(btn.style, {
   zIndex: "9999",
 });
 document.body.appendChild(btn);
+
+const btn2 = document.createElement("button");
+btn2.setAttribute("type", "button");
+btn2.innerText = "Fetch /";
+btn2.onclick = () => {
+  api.post("/").then((res) => console.log(res));
+};
+Object.assign(btn2.style, {
+  position: "fixed",
+  top: "0",
+  left: "200px",
+  width: "100px",
+  height: "100px",
+  "text-align": "center",
+  background: "white",
+  padding: "10px",
+  zIndex: "9999",
+});
+document.body.appendChild(btn2);
 
 const latencyMonitor = document.createElement("div");
 Object.assign(latencyMonitor.style, {

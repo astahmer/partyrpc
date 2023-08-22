@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "partykit": "0.0.0-1f86d17",
+    "partykit": "0.0.0-9d532f8",
     "partyrpc": "workspace:^",
     "partysocket": "0.0.0-e57200d",
     "valibot": "^0.12.0"
