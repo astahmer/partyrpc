@@ -1,39 +1,9 @@
 import * as v from "valibot";
 
 import { PartyKitConnection, PartyKitRoom } from "partykit/server";
+import { AnySchema, Infer, createAssert, vIssuesToValidationIssues, ValidationIssue } from "./schema-assert";
 
 type Pretty<T> = { [K in keyof T]: T[K] } & {};
-
-// Compatiblity layer for the future migration to typeschema
-type Schema = v.BaseSchema;
-type Infer<TSchema> = TSchema extends v.BaseSchema ? v.Output<TSchema> : never;
-
-class ValidationIssue extends Error {
-  constructor(message: string, public path?: Array<string | number | symbol>) {
-    super(message);
-  }
-}
-
-const createAssert = <TSchema extends Schema>(schema: TSchema) => {
-  return (data: unknown) => {
-    const result = v.safeParse(schema, data);
-    if (result.success) {
-      return result.data;
-    }
-
-    return {
-      _issues: result.error.issues.map(vIssuesToValidationIssues),
-    };
-  };
-};
-
-const vIssuesToValidationIssues = ({ message, path }: v.Issue) => {
-  return new ValidationIssue(
-    message,
-    path?.map(({ key }) => key),
-  );
-};
-//
 
 type TypedHandler<TSchema, Context> = (
   message: TSchema,
@@ -42,7 +12,7 @@ type TypedHandler<TSchema, Context> = (
   ctx: Context,
 ) => void | Promise<void>;
 
-type CreateAssert<TSchema extends Schema> = (
+type CreateAssert<TSchema extends AnySchema> = (
   schema: TSchema,
 ) => (data: unknown) => Promise<Infer<TSchema> | { _issues: ValidationIssue[] }>;
 
@@ -53,10 +23,10 @@ type EventDefinition<TType, TSchema, Context> = {
   schema: TSchema;
   onMessage: TSchema extends v.NeverSchema
     ? never
-    : TSchema extends Schema
+    : TSchema extends AnySchema
     ? TypedHandler<Pretty<Infer<TSchema> & { type: TType }>, Context>
     : TypedHandler<{ type: TType }, Context>;
-  assert: ReturnType<CreateAssert<TSchema extends Schema ? TSchema : Schema>>;
+  assert: ReturnType<CreateAssert<TSchema extends AnySchema ? TSchema : AnySchema>>;
 };
 export type AnyEventMap = {
   [K: string]: {
