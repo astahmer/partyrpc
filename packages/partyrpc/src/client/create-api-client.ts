@@ -1,13 +1,10 @@
 import {
-  Method,
+  AnyEndpointDefinition,
   EndpointParameters,
   EndpointsMap,
-  EndpointDefinition,
-  createFetchHandler,
-  createRoute,
   InferParameters,
+  Method,
 } from "../server/create-fetch-handler";
-import * as v from "valibot";
 import { Infer } from "../server/schema-assert";
 import { FilterArrayByValue, FindArrayByValue } from "../shared/utility.types";
 
@@ -15,10 +12,10 @@ export type Fetcher = (
   method: Method,
   url: string,
   parameters?: EndpointParameters | undefined,
-) => Promise<EndpointDefinition<unknown>["response"]>;
+) => Promise<AnyEndpointDefinition["response"]>;
 
 export class ApiClient<
-  TEndpoints extends readonly EndpointDefinition<unknown>[],
+  TEndpoints extends readonly AnyEndpointDefinition[],
   TEndpointMap extends EndpointsMap<TEndpoints> = EndpointsMap<TEndpoints>,
 > {
   baseUrl: string = "";
@@ -53,6 +50,7 @@ export class ApiClient<
     TEndpoint extends FindArrayByValue<TEndpointMap["post"], { path: Path }>,
   >(
     path: Path,
+    // TODO: make body required
     ...params: MaybeOptionalArg<InferParameters<TEndpoint["parameters"]>>
   ): Promise<Infer<TEndpoint["response"]>> {
     return this.fetcher("post", this.baseUrl + path, params[0]) as Promise<Infer<TEndpoint["response"]>>;
@@ -111,7 +109,7 @@ export class ApiClient<
  api.put("/users/:id", { path: { id: 1 }, body: { name: "John" } }).then((user) => console.log(user));
  ```
 */
-export function createApiClient<TEndpoints extends readonly EndpointDefinition<unknown>[]>(
+export function createApiClient<TEndpoints extends readonly AnyEndpointDefinition[]>(
   endpoints: TEndpoints,
   fetcher: Fetcher,
   baseUrl?: string,
@@ -124,46 +122,3 @@ type RequiredKeys<T> = {
 }[keyof T];
 
 type MaybeOptionalArg<T> = RequiredKeys<T> extends never ? [config?: T] : [config: T];
-
-const router = createFetchHandler([
-  createRoute({
-    method: "get",
-    path: "/gagaga",
-    parameters: {
-      body: v.object({ title: v.string() }),
-    },
-    response: v.object({ res: v.string() }),
-    handler: (req) => {
-      req.params;
-      return new Response("hello");
-    },
-  }),
-  createRoute({
-    method: "post",
-    path: "/gagaga",
-    parameters: {
-      body: v.object({ dfsfqds: v.string() }),
-    },
-    response: v.object({ hdgfdvdc: v.string() }),
-    handler: (req) => {
-      req.params;
-      return new Response("hello");
-    },
-  }),
-  createRoute({
-    method: "post",
-    path: "/non",
-    response: v.object({ nonon: v.number() }),
-    handler: (req) => {
-      req.params;
-      return new Response("hello");
-    },
-  }),
-]);
-
-const client = createApiClient(router.endpoints, fetch as any);
-// const client = new ApiClient(router.endpoints, fetcher);
-const get = client.get("/gagaga", { body: { title: "aa" } });
-const post = client.post("/non");
-// const azazaz = client.find("/gagaga", "post");
-// const azazaz = client.find("/non","post")

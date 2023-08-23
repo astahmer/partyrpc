@@ -1,14 +1,22 @@
 import * as v from "valibot";
 import { PartyKitConnection, PartyKitRoom } from "partykit/server";
-import { EndpointDefinition, PartyFetchHandler, createFetchHandler, createRoute } from "./create-fetch-handler";
+import {
+  AnyEndpointDefinition,
+  Endpoint,
+  EndpointParameters,
+  Method,
+  PartyFetchHandler,
+  createFetchHandler,
+  createRoute,
+} from "./create-fetch-handler";
 import { AnySchema, Infer, createAssert, vIssuesToValidationIssues, ValidationIssue } from "./schema-assert";
 import type { Pretty } from "../shared/utility.types";
 
-type TypedHandler<TSchema, Context> = (
+type TypedHandler<TSchema, UserContext> = (
   message: TSchema,
   ws: PartyKitConnection,
   room: PartyKitRoom,
-  ctx: Context,
+  ctx: UserContext,
 ) => void | Promise<void>;
 
 type CreateAssert<TSchema extends AnySchema> = (
@@ -17,14 +25,8 @@ type CreateAssert<TSchema extends AnySchema> = (
 
 type AssertReturn<TSchema> = Infer<TSchema> | { _issues: ValidationIssue[] };
 
-type EventDefinition<TType, TSchema, Context> = {
+type EventDefinition<TType, TSchema, UserContext> = EventItem<TSchema, TType, UserContext> & {
   type: TType;
-  schema: TSchema;
-  onMessage: TSchema extends v.NeverSchema
-    ? never
-    : TSchema extends AnySchema
-    ? TypedHandler<Pretty<Infer<TSchema> & { type: TType }>, Context>
-    : TypedHandler<{ type: TType }, Context>;
   assert: ReturnType<CreateAssert<TSchema extends AnySchema ? TSchema : AnySchema>>;
 };
 export type AnyEventMap = {
@@ -34,13 +36,15 @@ export type AnyEventMap = {
   };
 };
 
-type EventMap<E, Context> = {
-  [K in keyof E]: {
-    schema: E[K];
-    onMessage: Infer<E[K]> extends never | v.NeverSchema
-      ? TypedHandler<{ type: K }, Context>
-      : TypedHandler<Pretty<Infer<E[K]> & { type: K }>, Context>;
-  };
+type EventItem<out TSchema, Key, in UserContext> = {
+  schema: TSchema;
+  onMessage: Infer<TSchema> extends never | v.NeverSchema
+    ? TypedHandler<{ type: Key }, UserContext>
+    : TypedHandler<Pretty<Infer<TSchema> & { type: Key }>, UserContext>;
+};
+
+type EventMap<out E, UserContext> = {
+  [K in keyof E]: EventItem<E[K], K, UserContext>;
 };
 
 const decoder = new TextDecoder();
@@ -66,7 +70,7 @@ type BasePartyResponses =
   | NoMatchingRouteResponse
   | UnexpectedErrorResponse;
 
-export const createPartyRpc = <Responses, Context = {}>() => {
+export const createPartyRpc = <Responses, UserContext = {}>() => {
   const send: PartyResponseHelpers<Responses>["send"] = (ws, message) => ws.send(JSON.stringify(message));
 
   const broadcast: PartyResponseHelpers<Responses>["broadcast"] = (room, message, without) =>
@@ -76,20 +80,20 @@ export const createPartyRpc = <Responses, Context = {}>() => {
     return message;
   };
 
-  function createEventsHandler<const TEvents>(events: EventMap<TEvents, Context>) {
+  function createEventsHandler<const TEvents>(events: EventMap<TEvents, UserContext>) {
     const eventEntries = Object.entries(events).map(([type, item]) => {
-      const event = item as EventDefinition<keyof TEvents, any, Context>;
+      const event = item as EventDefinition<keyof TEvents, any, UserContext>;
       return [type, { type, onMessage: event.onMessage, schema: event.schema, assert: createAssert(event.schema) }] as [
         typeof type,
         typeof event,
       ];
     });
 
-    const eventsMap = new Map<keyof TEvents, EventDefinition<keyof TEvents, unknown, Context>>(eventEntries as any);
+    const eventsMap = new Map<keyof TEvents, EventDefinition<keyof TEvents, unknown, UserContext>>(eventEntries as any);
     const types = Object.keys(events) as Array<keyof TEvents>;
     const withType = v.object({ type: v.enumType(types as any) });
 
-    async function onMessage(msg: string | ArrayBuffer, ws: PartyKitConnection, room: PartyKitRoom, ctx: Context) {
+    const onMessage: TypedHandler<string | ArrayBuffer, UserContext> = async (msg, ws, room, ctx) => {
       const decoded = decode<unknown>(msg);
 
       if (!decoded) {
@@ -114,7 +118,7 @@ export const createPartyRpc = <Responses, Context = {}>() => {
       const message = decoded as { type: keyof TEvents };
       try {
         const result = (await route.assert(message)) as AssertReturn<unknown>;
-        if (typeof result === "object" && "issues" in result) {
+        if (typeof result === "object" && "_issues" in result) {
           return send(ws, { type: "ws.error", reason: "invalid message", _issues: result._issues });
         }
 
@@ -122,9 +126,9 @@ export const createPartyRpc = <Responses, Context = {}>() => {
       } catch (err) {
         return send(ws, { type: "ws.error", reason: "unexpected error" });
       }
-    }
+    };
 
-    const eventDefs = Object.fromEntries(eventEntries) as unknown as EventDefinitionMap<TEvents, Context>;
+    const eventDefs = Object.fromEntries(eventEntries) as unknown as EventDefinitionMap<TEvents, UserContext>;
 
     return { send, broadcast, create, onMessage, events: eventDefs, responses: {} as Responses, __events: events };
   }
@@ -137,7 +141,7 @@ export const createPartyRpc = <Responses, Context = {}>() => {
     events: createEventsHandler,
     endpoints: createFetchHandler,
     route: createRoute,
-  } satisfies CreatePartyRpc<Responses, Context> as CreatePartyRpc<Responses, Context>;
+  } satisfies CreatePartyRpc<Responses, UserContext> as CreatePartyRpc<Responses, UserContext>;
 };
 
 // prevent TS issues when generating dts such as:
@@ -153,21 +157,28 @@ export type PartyResponseHelpers<Responses> = {
   create: <Message extends Responses | BasePartyResponses>(message: Message) => Message;
 };
 
-export type CreatePartyRpc<Responses, Context> = PartyResponseHelpers<Responses> & {
-  events: <const TEvents>(events: EventMap<TEvents, Context>) => PartyRpcEvents<TEvents, Responses, Context>;
-  endpoints: <const TEndpoints extends readonly EndpointDefinition<unknown>[]>(
+export type CreatePartyRpc<Responses, UserContext> = PartyResponseHelpers<Responses> & {
+  events: <const TEvents>(events: EventMap<TEvents, UserContext>) => PartyRpcEvents<TEvents, Responses, UserContext>;
+  endpoints: <const TEndpoints extends readonly AnyEndpointDefinition[], UserContext>(
     endpoints: TEndpoints,
-  ) => PartyFetchHandler<TEndpoints>;
-  route: <const TPath, TEndpoint extends EndpointDefinition<TPath>>(endpoint: TEndpoint) => TEndpoint;
+  ) => PartyFetchHandler<TEndpoints, UserContext>;
+  route: <
+    const TPath,
+    const TMethod extends Method,
+    const TParams extends EndpointParameters | undefined,
+    const TResponse,
+  >(
+    endpoint: Endpoint<TPath, TMethod, TParams, TResponse, UserContext>,
+  ) => Endpoint<TPath, TMethod, TParams, TResponse, UserContext>;
 };
 
 type EventDefinitionMap<TEvents, Context> = {
   [EventKey in keyof TEvents]: EventDefinition<EventKey, TEvents[EventKey], Context>;
 };
 
-export type PartyRpcEvents<TEvents, Responses, Context> = PartyResponseHelpers<Responses> & {
-  onMessage: (message: string | ArrayBuffer, ws: PartyKitConnection, room: PartyKitRoom, ctx: Context) => Promise<void>;
-  events: EventDefinitionMap<TEvents, Context>;
+export type PartyRpcEvents<TEvents, Responses, UserContext> = PartyResponseHelpers<Responses> & {
+  onMessage: TypedHandler<string | ArrayBuffer, UserContext>;
+  events: EventDefinitionMap<TEvents, UserContext>;
   responses: Responses;
-  __events: EventMap<TEvents, Context>;
+  __events: EventMap<TEvents, UserContext>;
 };

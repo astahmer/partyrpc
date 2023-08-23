@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "ofetch": "^1.2.1",
     "partykit": "0.0.0-9d532f8",
     "partyrpc": "workspace:^",
     "partysocket": "0.0.0-e57200d",
