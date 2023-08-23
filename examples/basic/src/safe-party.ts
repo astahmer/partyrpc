@@ -1,30 +1,39 @@
 import * as v from "valibot";
 import { createPartyRpc } from "partyrpc/server";
 
-type Context = { counter: number };
+type UContext = { counter: number };
 type PongResponse = { type: "pong"; size: number };
 type LatencyResponse = { type: "latency"; id: string };
 type CounterResponse = { type: "counter"; counter: number };
 
 type PartyResponses = PongResponse | LatencyResponse | CounterResponse;
 
-const party = createPartyRpc<PartyResponses, Context>();
+const party = createPartyRpc<PartyResponses, UContext>();
 export const router = party.endpoints([
   party.route({
-    method: "post",
-    path: "/",
-    handler(req, lobby, ctx) {
-      return new Response("Hello world!");
+    method: "get",
+    path: "/api/counter",
+    response: v.object({ counter: v.number() }),
+    handler(_req, _lobby, _ctx, userCtx) {
+      return { counter: userCtx.counter };
     },
-    response: v.object({ status: v.number(), body: v.string() }),
   }),
   party.route({
-    method: "get",
-    path: "/gaga",
-    handler(req, lobby, ctx) {
-      return new Response("azazazzaaz!");
+    method: "post",
+    path: "/api/counter",
+    parameters: {
+      body: v.object({ amount: v.number() }),
     },
-    response: v.object({ status: v.number(), body: v.string() }),
+    response: v.object({ counter: v.number(), added: v.number() }),
+    handler(req, lobby, ctx, userCtx) {
+      req.params;
+      //   ^?
+
+      userCtx.counter += req.params.body.amount;
+      // ^?
+
+      return { counter: userCtx.counter, added: req.params.body.amount };
+    },
   }),
 ]);
 

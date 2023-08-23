@@ -5,7 +5,7 @@ declare global {
   const SOME_GLOBAL: string;
 }
 
-const ctx = { counter: 0 };
+const userCtx = { counter: 0 };
 
 export default {
   onConnect(ws, room) {
@@ -16,9 +16,8 @@ export default {
     console.log(SOME_GLOBAL);
     // your business logic here
     ws.addEventListener("message", (evt) => {
-      safeParty.onMessage(evt.data, ws, room, ctx);
+      safeParty.onMessage(evt.data, ws, room, userCtx);
     });
-    console.trace();
   },
 
   // // onMessage(msg, conn, room) {
@@ -59,6 +58,6 @@ export default {
   async unstable_onFetch(req, lobby, ctx) {
     console.log("unstable_onFetch", req.url);
     // return new Response("unstable_onFetch:" + req.url);
-    return router.onRequest(req, lobby, ctx);
+    return router.onFetch(req, lobby, ctx, userCtx);
   },
 } satisfies PartyKitServer;

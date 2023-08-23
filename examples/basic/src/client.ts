@@ -1,4 +1,5 @@
 import PartySocket from "partysocket";
+import { ofetch } from "ofetch";
 import { createPartyClient, createApiClient } from "partyrpc/client";
 import { SafePartyEvents, SafePartyResponses, router } from "./safe-party";
 
@@ -9,8 +10,14 @@ const partySocket = new PartySocket({
   room: "some-room",
 });
 const client = createPartyClient<SafePartyEvents, SafePartyResponses>(partySocket, { debug: true });
+
 const api = createApiClient(router.endpoints, (method, url, params) =>
-  fetch(url, { method }).then((res) => res.text()),
+  ofetch(url, {
+    method,
+    body: params?.body as any,
+    headers: params?.header as any,
+    query: params?.query as any,
+  }),
 ).setBaseUrl("http://127.0.0.1:1999");
 
 const latencyPingStarts = new Map();
@@ -57,13 +64,13 @@ Object.assign(btn.style, {
 });
 document.body.appendChild(btn);
 
-const btn2 = document.createElement("button");
-btn2.setAttribute("type", "button");
-btn2.innerText = "Fetch /";
-btn2.onclick = () => {
-  api.post("/").then((res) => console.log(res));
+const getCounter = document.createElement("button");
+getCounter.setAttribute("type", "button");
+getCounter.innerText = "Get counter";
+getCounter.onclick = () => {
+  api.get("/api/counter").then((res) => console.log(res));
 };
-Object.assign(btn2.style, {
+Object.assign(getCounter.style, {
   position: "fixed",
   top: "0",
   left: "200px",
@@ -74,7 +81,30 @@ Object.assign(btn2.style, {
   padding: "10px",
   zIndex: "9999",
 });
-document.body.appendChild(btn2);
+document.body.appendChild(getCounter);
+
+const addToCounter = document.createElement("button");
+addToCounter.setAttribute("type", "button");
+addToCounter.innerText = "Add to counter";
+addToCounter.onclick = () => {
+  api.post("/api/counter", { body: { amount: 4 } }).then((res) => {
+    res;
+    // ^?
+    return console.log(res);
+  });
+};
+Object.assign(addToCounter.style, {
+  position: "fixed",
+  top: "0",
+  left: "400px",
+  width: "100px",
+  height: "100px",
+  "text-align": "center",
+  background: "white",
+  padding: "10px",
+  zIndex: "9999",
+});
+document.body.appendChild(addToCounter);
 
 const latencyMonitor = document.createElement("div");
 Object.assign(latencyMonitor.style, {

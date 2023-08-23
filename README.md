@@ -9,8 +9,12 @@ better with typesafety.
 
 ## Usage
 
-- Events: what your party server expects to receive from clients
-- Responses: what your party server sends to clients
+### Terminology
+
+- Events: what WS messages your party server expects to receive from clients
+- Responses: what WS messages your party server sends back to clients
+
+### WS Events
 
 Define your (safe) party events and responses:
 
@@ -19,14 +23,14 @@ Define your (safe) party events and responses:
 import * as v from "valibot";
 import { createPartyRpc } from "partyrpc/server";
 
-type Context = { counter: number };
+type UContext = { counter: number };
 type PongResponse = { type: "pong"; size: number };
 type LatencyResponse = { type: "latency"; id: string };
 type CounterResponse = { type: "counter"; counter: number };
 
 type PartyResponses = PongResponse | LatencyResponse | CounterResponse;
 
-const party = createPartyRpc<PartyResponses, Context>();
+const party = createPartyRpc<PartyResponses, UContext>();
 
 export const safeParty = party.events({
   ping: {
@@ -156,7 +160,74 @@ function App() {
 }
 ```
 
-# Caveats
+### Fetch requests
+
+You can also use `partyrpc` to define typesafe endpoints on your PartyKit server.
+
+```ts
+// src/safe-party.ts
+import * as v from "valibot";
+import { createPartyRpc } from "partyrpc/server";
+
+type UContext = { counter: number };
+
+const party = createPartyRpc<PartyResponses, UContext>();
+export const router = party.endpoints([
+  party.route({
+    method: "get",
+    path: "/api/counter",
+    response: v.object({ counter: v.number() }),
+    handler(_req, _lobby, _ctx, userCtx) {
+      return { counter: userCtx.counter };
+    },
+  }),
+  party.route({
+    method: "post",
+    path: "/api/counter",
+    parameters: {
+      body: v.object({ amount: v.number() }),
+    },
+    response: v.object({ counter: v.number(), added: v.number() }),
+    handler(req, lobby, ctx, userCtx) {
+      req.params;
+      //   ^? typed as { body: { amount: number } }
+
+      userCtx.counter += req.params.body.amount;
+      // ^? typed as { counter: number }
+
+      return { counter: userCtx.counter, added: req.params.body.amount };
+    },
+  }),
+]);
+```
+
+and later used them with your own fetcher instance:
+
+```ts
+// src/client.ts
+import { ofetch } from "ofetch";
+import { createPartyClient } from "partyrpc/client";
+import { SafePartyEvents, SafePartyResponses } from "./safe-party";
+
+const api = createApiClient(router.endpoints, (method, url, params) =>
+  ofetch(url, {
+    method,
+    body: params?.body as any,
+    headers: params?.header as any,
+    query: params?.query as any,
+  }),
+).setBaseUrl("http://127.0.0.1:1999");
+
+// ...
+
+api.post("/api/counter", { body: { amount: 4 } }).then((res) => {
+  res;
+  // ^? typed as { counter: number; added: number; }
+  return console.log(res);
+});
+```
+
+## Caveats
 
 - Currently only compatible with `valibot`, ideally it'll use [`typeschema`](https://github.com/decs/typeschema) at some
   point to allow you to use your preferred validation library.

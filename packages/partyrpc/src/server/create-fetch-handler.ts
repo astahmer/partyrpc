@@ -1,45 +1,59 @@
 import type { ExecutionContext, Response as PartyKitResponse } from "@cloudflare/workers-types";
-import { Router } from "itty-router";
+import { Router, json, withContent } from "itty-router";
 import * as v from "valibot";
 import { Infer, createAssert } from "./schema-assert";
 import { PartyKitRoom } from "partykit/server";
-import { FilterArrayByValue, Pretty } from "../shared/utility.types";
+import { FilterArrayByValue } from "../shared/utility.types";
 
-export function createRoute<const TPath, TEndpoint extends EndpointDefinition<TPath>>(endpoint: TEndpoint): TEndpoint {
+export function createRoute<
+  const TPath,
+  const TMethod extends Method,
+  const TParams extends EndpointParameters | undefined,
+  const TResponse,
+  UserContext,
+>(
+  endpoint: Endpoint<TPath, TMethod, TParams, TResponse, UserContext>,
+): Endpoint<TPath, TMethod, TParams, TResponse, UserContext> {
   const input = removeUndefineds({
     body: endpoint.parameters?.body,
     query: endpoint.parameters?.query,
     header: endpoint.parameters?.header,
     // path: endpoint.parameters?.path, // TODO ?
   });
-  const assert = createAssert(v.object(input));
+  const assert = createAssert(v.partial(v.object(input)));
+  console.log(input);
 
-  const typedFetchHandler: typeof endpoint.handler = (req, lobby, ctx) => {
+  const typedFetchHandler: typeof endpoint.handler = async (req, lobby, ctx, userCtx) => {
     const url = new URL(req.url);
-    const query = Object.fromEntries(url.searchParams.entries());
-    assert(
-      removeUndefineds({
-        body: req.body,
-        query: Object.keys(query).length ? query : undefined,
-        header: req.headers,
-      }),
-    );
+    const query = removeUndefineds(Object.fromEntries(url.searchParams.entries()));
+    const params = removeUndefineds({
+      body: req.body,
+      query: Object.keys(query).length ? query : undefined,
+      header: req.headers,
+    });
+    const result = assert(params);
+    if (typeof result === "object" && "_issues" in result) {
+      return { type: "fetch.error", reason: "invalid params", _issues: result._issues } as any;
+    }
 
-    return endpoint.handler(req, lobby, ctx);
+    // @ts-expect-error
+    req.params = params;
+
+    return endpoint.handler(req, lobby, ctx, userCtx);
   };
 
   return {
     method: endpoint.method,
     path: endpoint.path,
+    parameters: endpoint.parameters,
     handler: typedFetchHandler,
     response: endpoint.response,
-    parameters: endpoint.parameters,
-  } as TEndpoint;
+  } as Endpoint<TPath, TMethod, TParams, TResponse, UserContext>;
 }
 
-export function createFetchHandler<const TEndpoints extends readonly EndpointDefinition<unknown>[]>(
+export function createFetchHandler<const TEndpoints extends readonly AnyEndpointDefinition[], UserContext>(
   endpointDefs: TEndpoints,
-): PartyFetchHandler<TEndpoints> {
+): PartyFetchHandler<TEndpoints, UserContext> {
   const router = Router();
   const _endpointsMap = {
     get: [] as FilterArrayByValue<TEndpoints, { method: "get" }>,
@@ -50,32 +64,38 @@ export function createFetchHandler<const TEndpoints extends readonly EndpointDef
     delete: [] as FilterArrayByValue<TEndpoints, { method: "delete" }>,
   };
 
-  (endpointDefs as TEndpoints extends EndpointDefinition<string>[] ? TEndpoints : never).forEach((endpoint) => {
-    router[endpoint.method](endpoint.path, endpoint.handler);
+  (endpointDefs as TEndpoints extends AnyEndpointDefinition[] ? TEndpoints : never).forEach((endpoint) => {
+    router[endpoint.method](endpoint.path, withContent, endpoint.handler as any);
     // @ts-expect-error
     _endpointsMap[endpoint.method].push(endpoint);
   });
 
   return {
-    onRequest(req, lobby, ctx) {
-      return router.handle(req, lobby, ctx);
+    onFetch(req, lobby, ctx, userCtx) {
+      return router
+        .handle(req, lobby, ctx, userCtx)
+        .then(json)
+        .catch(() => {
+          return new Response("Internal server error", { status: 500 });
+        });
     },
     endpoints: endpointDefs as any,
     _endpointsMap,
   };
 }
 
-export interface PartyFetchHandler<TEndpoints extends readonly EndpointDefinition<unknown>[]> {
-  onRequest: (
+export interface PartyFetchHandler<TEndpoints extends readonly AnyEndpointDefinition[], UserContext> {
+  onFetch: (
     req: Request,
     lobby: { env: Record<string, unknown>; parties: PartyKitRoom["parties"] },
     ctx: ExecutionContext,
+    userCtx: UserContext,
   ) => UserDefinedResponse | Promise<UserDefinedResponse>;
   endpoints: TEndpoints;
   _endpointsMap: EndpointsMap<TEndpoints>;
 }
 
-export interface EndpointsMap<TEndpoints extends readonly EndpointDefinition<unknown>[]> {
+export interface EndpointsMap<TEndpoints extends readonly AnyEndpointDefinition[]> {
   get: FilterArrayByValue<TEndpoints, { method: "get" }>;
   head: FilterArrayByValue<TEndpoints, { method: "head" }>;
   post: FilterArrayByValue<TEndpoints, { method: "post" }>;
@@ -96,11 +116,6 @@ export type InferParameters<TParams extends EndpointParameters> = {
 export type MutationMethod = "post" | "put" | "patch" | "delete";
 export type Method = "get" | "head" | MutationMethod;
 
-export interface DefaultEndpoint {
-  parameters?: EndpointParameters | undefined;
-  response: unknown;
-}
-
 // https://github.com/partykit/partykit/blob/18c0543ded591ea26b60a1970ce69d03779de103/packages/partykit/src/server.ts#L15
 // Because when you construct a `new Response()` in a user script,
 // it's assumed to be a standards-based Fetch API Response, unless overridden.
@@ -108,25 +123,40 @@ export interface DefaultEndpoint {
 type FetchResponse = Response;
 type UserDefinedResponse = FetchResponse | PartyKitResponse;
 
-export type TypedFetchHandler<TParams extends EndpointParameters | undefined> = (
-  // req: Request & (TParams extends EndpointParameters ? { params: InferParameters<TParams> } : {}),
-  req: Request &
-    (TParams extends undefined
-      ? never
-      : { params: InferParameters<TParams extends EndpointParameters ? TParams : never> }),
+export type Endpoint<
+  TPath,
+  TMethod extends Method,
+  in out TParams extends EndpointParameters | undefined,
+  TResponse,
+  UserContext,
+> = {
+  path: TPath;
+  method: TMethod;
+  parameters?: TParams;
+  response: TResponse;
+  handler: TypedFetchHandler<
+    undefined extends TParams ? unknown : TParams extends EndpointParameters ? InferParameters<TParams> : unknown,
+    Infer<TResponse> | Promise<Infer<TResponse>>,
+    UserContext
+  >;
+};
+
+export type TypedFetchHandler<in TParams, TResponse, in UserContext> = (
+  req: Request & { content: any; params: TParams },
   lobby: {
     env: Record<string, unknown>;
     parties: PartyKitRoom["parties"];
   },
   ctx: ExecutionContext,
-) => UserDefinedResponse | Promise<UserDefinedResponse>;
+  userCtx: UserContext,
+) => TResponse;
 
-export interface EndpointDefinition<TPath, TConfig extends DefaultEndpoint = DefaultEndpoint> {
+export interface AnyEndpointDefinition {
   method: Method;
-  path: TPath;
-  handler: TypedFetchHandler<TConfig["parameters"]>;
-  parameters?: TConfig["parameters"];
-  response: TConfig["response"];
+  path: string;
+  parameters?: unknown;
+  response: unknown;
+  handler: TypedFetchHandler<never, unknown, never>;
 }
 
 /** Remove undefined properties in object */
@@ -140,45 +170,3 @@ const removeUndefineds = <Value = Record<string, unknown>>(obj: Value) =>
     }),
     {},
   );
-
-const router = createFetchHandler([
-  createRoute({
-    method: "get",
-    path: "/",
-    // parameters: {
-    //   body: v.object({
-    //     title: v.string(),
-    //   }),
-    // },
-    response: v.object({ res: v.string() }),
-    handler: (req) => {
-      req.params;
-      return new Response("hello");
-    },
-  }),
-  createRoute({
-    method: "post",
-    path: "/non",
-    response: v.object({ nonon: v.number() }),
-    handler: (req) => {
-      req.params;
-      return new Response("hello");
-    },
-  }),
-]);
-
-router.endpoints;
-//     ^?
-
-// router._types;
-//      ^?
-
-// router._endpointsMap.
-//      ^?
-
-// type Endpoint<TConfig extends DefaultEndpoint = DefaultEndpoint> = {
-//   method: Method;
-//   path: string;
-//   parameters?: TConfig["parameters"];
-//   response: TConfig["response"];
-// };
