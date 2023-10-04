@@ -50,7 +50,7 @@ export class ApiClient<
     TEndpoint extends FindArrayByValue<TEndpointMap["post"], { path: Path }>,
   >(
     path: Path,
-    // TODO: make body required
+    // TODO fix body has to be required
     ...params: MaybeOptionalArg<InferParameters<TEndpoint["parameters"]>>
   ): Promise<Infer<TEndpoint["response"]>> {
     return this.fetcher("post", this.baseUrl + path, params[0]) as Promise<Infer<TEndpoint["response"]>>;

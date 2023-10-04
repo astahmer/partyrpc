@@ -12,6 +12,9 @@ import {
 import { AnySchema, Infer, createAssert, vIssuesToValidationIssues, ValidationIssue } from "./schema-assert";
 import type { Pretty } from "../shared/utility.types";
 
+// update partykit to use latest version, check type changes
+// https://github.com/partykit/partykit/blob/main/.changeset/cyan-houses-hope.md
+
 type TypedHandler<TSchema, UserContext> = (
   message: TSchema,
   ws: PartyKitConnection,
