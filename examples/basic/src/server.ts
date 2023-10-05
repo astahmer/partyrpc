@@ -55,8 +55,8 @@ export default {
   //   console.log(SOME_GLOBAL);
   //   return new Response("Hello world:" + req.headers.get("x-foo") + " " + room.id);
   // },
-  async unstable_onFetch(req, lobby, ctx) {
-    console.log("unstable_onFetch", req.url);
+  async onFetch(req, lobby, ctx) {
+    console.log("onFetch", req.url);
     // return new Response("unstable_onFetch:" + req.url);
     return router.onFetch(req, lobby, ctx, userCtx);
   },

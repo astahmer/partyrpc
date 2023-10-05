@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { PartyKitConnection, PartyKitRoom } from "partykit/server";
+import type * as Party from "partykit/server";
 import {
   AnyEndpointDefinition,
   Endpoint,
@@ -12,13 +12,10 @@ import {
 import { AnySchema, Infer, createAssert, vIssuesToValidationIssues, ValidationIssue } from "./schema-assert";
 import type { Pretty } from "../shared/utility.types";
 
-// update partykit to use latest version, check type changes
-// https://github.com/partykit/partykit/blob/main/.changeset/cyan-houses-hope.md
-
 type TypedHandler<TSchema, UserContext> = (
   message: TSchema,
-  ws: PartyKitConnection,
-  room: PartyKitRoom,
+  ws: Party.Connection,
+  party: Party.Party,
   ctx: UserContext,
 ) => void | Promise<void>;
 
@@ -151,9 +148,9 @@ export const createPartyRpc = <Responses, UserContext = {}>() => {
 // The inferred type of 'createPartyRpc' cannot be named without a reference to ...
 
 export type PartyResponseHelpers<Responses> = {
-  send: <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, message: Message) => void;
+  send: <Message extends BasePartyResponses | Responses>(ws: Party.Connection, message: Message) => void;
   broadcast: <Message extends BasePartyResponses | Responses>(
-    room: PartyKitRoom,
+    party: Party.Party,
     message: Message,
     without?: string[] | undefined,
   ) => void;
