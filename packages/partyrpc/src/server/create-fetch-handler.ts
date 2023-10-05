@@ -1,8 +1,8 @@
-import type { ExecutionContext, Response as PartyKitResponse } from "@cloudflare/workers-types";
+import type { ExecutionContext, Request as PartyKitRequest } from "@cloudflare/workers-types";
 import { Router, json, withContent } from "itty-router";
 import * as v from "valibot";
 import { Infer, createAssert } from "./schema-assert";
-import { PartyKitRoom } from "partykit/server";
+import type * as Party from "partykit/server";
 import { FilterArrayByValue } from "../shared/utility.types";
 
 export function createRoute<
@@ -86,11 +86,11 @@ export function createFetchHandler<const TEndpoints extends readonly AnyEndpoint
 
 export interface PartyFetchHandler<TEndpoints extends readonly AnyEndpointDefinition[], UserContext> {
   onFetch: (
-    req: Request,
-    lobby: { env: Record<string, unknown>; parties: PartyKitRoom["parties"] },
+    req: PartyKitRequest,
+    lobby: Party.FetchLobby,
     ctx: ExecutionContext,
     userCtx: UserContext,
-  ) => UserDefinedResponse | Promise<UserDefinedResponse>;
+  ) => Response | Promise<Response>;
   endpoints: TEndpoints;
   _endpointsMap: EndpointsMap<TEndpoints>;
 }
@@ -116,13 +116,6 @@ export type InferParameters<TParams extends EndpointParameters> = {
 export type MutationMethod = "post" | "put" | "patch" | "delete";
 export type Method = "get" | "head" | MutationMethod;
 
-// https://github.com/partykit/partykit/blob/18c0543ded591ea26b60a1970ce69d03779de103/packages/partykit/src/server.ts#L15
-// Because when you construct a `new Response()` in a user script,
-// it's assumed to be a standards-based Fetch API Response, unless overridden.
-// This is fine by us, let user return whichever response type.
-type FetchResponse = Response;
-type UserDefinedResponse = FetchResponse | PartyKitResponse;
-
 export type Endpoint<
   TPath,
   TMethod extends Method,
@@ -142,11 +135,8 @@ export type Endpoint<
 };
 
 export type TypedFetchHandler<in TParams, TResponse, in UserContext> = (
-  req: Request & { content: any; params: TParams },
-  lobby: {
-    env: Record<string, unknown>;
-    parties: PartyKitRoom["parties"];
-  },
+  req: PartyKitRequest & { content: any; params: TParams },
+  lobby: Party.FetchLobby,
   ctx: ExecutionContext,
   userCtx: UserContext,
 ) => TResponse;
