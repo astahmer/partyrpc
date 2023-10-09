@@ -8,7 +8,7 @@ import { FilterArrayByValue } from "../shared/utility.types";
 export function createRoute<
   const TPath,
   const TMethod extends Method,
-  const TParams extends EndpointParameters | undefined,
+  const TParams extends TMethod extends "post" ? EndpointParameters<TMethod> : EndpointParameters<TMethod> | undefined,
   const TResponse,
   UserContext,
 >(
@@ -104,12 +104,23 @@ export interface EndpointsMap<TEndpoints extends readonly AnyEndpointDefinition[
   delete: FilterArrayByValue<TEndpoints, { method: "delete" }>;
 }
 
-export interface EndpointParameters {
+export interface AnyEndpointParameters {
   body?: unknown;
   query?: Record<string, unknown>;
   header?: Record<string, unknown>;
 }
-export type InferParameters<TParams extends EndpointParameters> = {
+
+interface EndpointWithBodyParameters {
+  body: unknown;
+  query?: Record<string, unknown>;
+  header?: Record<string, unknown>;
+}
+
+export type EndpointParameters<TMethod extends Method> = TMethod extends "post"
+  ? EndpointWithBodyParameters
+  : AnyEndpointParameters | undefined;
+
+export type InferParameters<TMethod extends Method, TParams extends EndpointParameters<TMethod>> = {
   [K in keyof TParams]: Infer<TParams[K]>;
 };
 
@@ -119,7 +130,7 @@ export type Method = "get" | "head" | MutationMethod;
 export type Endpoint<
   TPath,
   TMethod extends Method,
-  in out TParams extends EndpointParameters | undefined,
+  in out TParams extends TMethod extends "post" ? EndpointParameters<TMethod> : EndpointParameters<TMethod> | undefined,
   TResponse,
   UserContext,
 > = {
@@ -128,7 +139,11 @@ export type Endpoint<
   parameters?: TParams;
   response: TResponse;
   handler: TypedFetchHandler<
-    undefined extends TParams ? unknown : TParams extends EndpointParameters ? InferParameters<TParams> : unknown,
+    undefined extends TParams
+      ? unknown
+      : TParams extends EndpointParameters<Method>
+      ? InferParameters<TMethod, TParams>
+      : unknown,
     Infer<TResponse> | Promise<Infer<TResponse>>,
     UserContext
   >;
