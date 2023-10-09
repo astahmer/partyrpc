@@ -165,7 +165,9 @@ export type CreatePartyRpc<Responses, UserContext> = PartyResponseHelpers<Respon
   route: <
     const TPath,
     const TMethod extends Method,
-    const TParams extends EndpointParameters | undefined,
+    const TParams extends TMethod extends "post"
+      ? EndpointParameters<TMethod>
+      : EndpointParameters<TMethod> | undefined,
     const TResponse,
   >(
     endpoint: Endpoint<TPath, TMethod, TParams, TResponse, UserContext>,

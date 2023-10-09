@@ -1,6 +1,6 @@
 import {
   AnyEndpointDefinition,
-  EndpointParameters,
+  AnyEndpointParameters,
   EndpointsMap,
   InferParameters,
   Method,
@@ -11,7 +11,7 @@ import { FilterArrayByValue, FindArrayByValue } from "../shared/utility.types";
 export type Fetcher = (
   method: Method,
   url: string,
-  parameters?: EndpointParameters | undefined,
+  parameters?: AnyEndpointParameters | undefined,
 ) => Promise<AnyEndpointDefinition["response"]>;
 
 export class ApiClient<
@@ -40,7 +40,7 @@ export class ApiClient<
     TEndpoint extends FindArrayByValue<TEndpointMap["get"], { path: Path }>,
   >(
     path: Path,
-    ...params: MaybeOptionalArg<InferParameters<TEndpoint["parameters"]>>
+    ...params: MaybeOptionalArg<InferParameters<"get", TEndpoint["parameters"]>>
   ): Promise<Infer<TEndpoint["response"]>> {
     return this.fetcher("get", this.baseUrl + path, params[0]) as Promise<Infer<TEndpoint["response"]>>;
   }
@@ -50,8 +50,7 @@ export class ApiClient<
     TEndpoint extends FindArrayByValue<TEndpointMap["post"], { path: Path }>,
   >(
     path: Path,
-    // TODO fix body has to be required
-    ...params: MaybeOptionalArg<InferParameters<TEndpoint["parameters"]>>
+    ...params: MaybeOptionalArg<InferParameters<"post", TEndpoint["parameters"]>>
   ): Promise<Infer<TEndpoint["response"]>> {
     return this.fetcher("post", this.baseUrl + path, params[0]) as Promise<Infer<TEndpoint["response"]>>;
   }
@@ -61,7 +60,7 @@ export class ApiClient<
     TEndpoint extends FindArrayByValue<TEndpointMap["put"], { path: Path }>,
   >(
     path: Path,
-    ...params: MaybeOptionalArg<InferParameters<TEndpoint["parameters"]>>
+    ...params: MaybeOptionalArg<InferParameters<"put", TEndpoint["parameters"]>>
   ): Promise<Infer<TEndpoint["response"]>> {
     return this.fetcher("put", this.baseUrl + path, params[0]) as Promise<Infer<TEndpoint["response"]>>;
   }
@@ -71,7 +70,7 @@ export class ApiClient<
     TEndpoint extends FindArrayByValue<TEndpointMap["patch"], { path: Path }>,
   >(
     path: Path,
-    ...params: MaybeOptionalArg<InferParameters<TEndpoint["parameters"]>>
+    ...params: MaybeOptionalArg<InferParameters<"patch", TEndpoint["parameters"]>>
   ): Promise<Infer<TEndpoint["response"]>> {
     return this.fetcher("patch", this.baseUrl + path, params[0]) as Promise<Infer<TEndpoint["response"]>>;
   }
@@ -81,7 +80,7 @@ export class ApiClient<
     TEndpoint extends FindArrayByValue<TEndpointMap["delete"], { path: Path }>,
   >(
     path: Path,
-    ...params: MaybeOptionalArg<InferParameters<TEndpoint["parameters"]>>
+    ...params: MaybeOptionalArg<InferParameters<"delete", TEndpoint["parameters"]>>
   ): Promise<Infer<TEndpoint["response"]>> {
     return this.fetcher("delete", this.baseUrl + path, params[0]) as Promise<Infer<TEndpoint["response"]>>;
   }
@@ -91,7 +90,7 @@ export class ApiClient<
     TEndpoint extends FindArrayByValue<TEndpointMap["head"], { path: Path }>,
   >(
     path: Path,
-    ...params: MaybeOptionalArg<InferParameters<TEndpoint["parameters"]>>
+    ...params: MaybeOptionalArg<InferParameters<"head", TEndpoint["parameters"]>>
   ): Promise<Infer<TEndpoint["response"]>> {
     return this.fetcher("head", this.baseUrl + path, params[0]) as Promise<Infer<TEndpoint["response"]>>;
   }
