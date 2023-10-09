@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "itty-router": "^4.0.22",
-    "partysocket": "0.0.8",
+    "partysocket": "0.0.9",
     "react": "^18.2.0",
     "valibot": "^0.12.0"
   },
@@ -42,7 +42,7 @@
     "@cloudflare/workers-types": "^4.20230821.0",
     "@types/node": "^20.5.0",
     "@types/react": "^18.2.20",
-    "partykit": "0.0.27",
+    "partykit": "0.0.29",
     "release-it": "^16.1.5",
     "tsup": "^7.2.0"
   },
