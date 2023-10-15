@@ -1,6 +1,6 @@
 import * as v from "valibot";
 
-import { PartyKitConnection, PartyKitRoom } from "partykit/server";
+import Party from "partykit/server";
 
 type Pretty<T> = { [K in keyof T]: T[K] } & {};
 
@@ -13,7 +13,6 @@ class ValidationIssue extends Error {
     super(message);
   }
 }
-
 const createAssert = <TSchema extends Schema>(schema: TSchema) => {
   return (data: unknown) => {
     const result = v.safeParse(schema, data);
@@ -37,8 +36,8 @@ const vIssuesToValidationIssues = ({ message, path }: v.Issue) => {
 
 type TypedHandler<TSchema, Context> = (
   message: TSchema,
-  ws: PartyKitConnection,
-  room: PartyKitRoom,
+  ws: Party.Connection,
+  room: Party.Party,
   ctx: Context,
 ) => void | Promise<void>;
 
@@ -118,7 +117,7 @@ export const createPartyRpc = <Responses, Context = {}>() => {
     const types = Object.keys(events) as Array<keyof TEvents>;
     const withType = v.object({ type: v.enumType(types as any) });
 
-    async function onMessage(msg: string | ArrayBuffer, ws: PartyKitConnection, room: PartyKitRoom, ctx: Context) {
+    async function onMessage(msg: string | ArrayBuffer, ws: Party.Connection, room: Party.Party, ctx: Context) {
       const decoded = decode<unknown>(msg);
 
       if (!decoded) {
@@ -169,9 +168,9 @@ export const createPartyRpc = <Responses, Context = {}>() => {
 // The inferred type of 'createPartyRpc' cannot be named without a reference to ...
 
 export type PartyResponseHelpers<Responses> = {
-  send: <Message extends BasePartyResponses | Responses>(ws: PartyKitConnection, message: Message) => void;
+  send: <Message extends BasePartyResponses | Responses>(ws: Party.Connection, message: Message) => void;
   broadcast: <Message extends BasePartyResponses | Responses>(
-    room: PartyKitRoom,
+    room: Party.Party,
     message: Message,
     without?: string[] | undefined,
   ) => void;
@@ -187,7 +186,7 @@ type EventDefinitionMap<TEvents, Context> = {
 };
 
 export type PartyRpcEvents<TEvents, Responses, Context> = PartyResponseHelpers<Responses> & {
-  onMessage: (message: string | ArrayBuffer, ws: PartyKitConnection, room: PartyKitRoom, ctx: Context) => Promise<void>;
+  onMessage: (message: string | ArrayBuffer, ws: Party.Connection, room: Party.Party, ctx: Context) => Promise<void>;
   events: EventDefinitionMap<TEvents, Context>;
   responses: Responses;
   __events: EventMap<TEvents, Context>;

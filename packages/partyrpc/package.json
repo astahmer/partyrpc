@@ -33,14 +33,14 @@
     }
   },
   "dependencies": {
-    "partysocket": "0.0.0-e57200d",
+    "partysocket": "0.0.10",
     "react": "^18.2.0",
     "valibot": "^0.12.0"
   },
   "devDependencies": {
     "@types/node": "^20.5.0",
     "@types/react": "^18.2.20",
-    "partykit": "0.0.0-1f86d17",
+    "partykit": "0.0.30",
     "release-it": "^16.1.5",
     "tsup": "^7.2.0"
   },
