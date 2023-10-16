@@ -10,26 +10,44 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "source": "./src/index.ts"
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts"
     },
     "./client": {
+      "source": "./src/client.ts",
       "types": "./dist/client.d.ts",
-      "import": "./dist/client.js",
-      "require": "./dist/client.cjs",
-      "source": "./src/client.ts"
+      "import": {
+        "types": "./dist/client.d.ts",
+        "default": "./dist/client.js"
+      },
+      "require": {
+        "types": "./dist/client.d.cts",
+        "default": "./dist/client.cjs"
+      }
     },
     "./react": {
+      "source": "./src/react.ts",
       "types": "./dist/react.d.ts",
-      "import": "./dist/react.js",
-      "require": "./dist/react.cjs",
-      "source": "./src/react.ts"
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.js"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
     },
     "./server": {
+      "source": "./src/server.ts",
       "types": "./dist/server.d.ts",
-      "import": "./dist/server.js",
-      "require": "./dist/server.cjs",
-      "source": "./src/server.ts"
+      "import": {
+        "types": "./dist/server.d.ts",
+        "default": "./dist/server.js"
+      },
+      "require": {
+        "types": "./dist/server.d.cts",
+        "default": "./dist/server.cjs"
+      }
     }
   },
   "dependencies": {
@@ -44,7 +62,8 @@
     "@types/react": "^18.2.20",
     "partykit": "0.0.29",
     "release-it": "^16.1.5",
-    "tsup": "^7.2.0"
+    "tsup": "^7.2.0",
+    "typescript": "^5.1.6"
   },
   "optionalDependencies": {
     "react": "^18.2.0"
