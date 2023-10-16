@@ -8,28 +8,29 @@
     "typecheck": "tsc --noEmit",
     "release": "pnpm build && release-it"
   },
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "source": "./src/index.ts"
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts"
     },
     "./client": {
+      "source": "./src/client.ts",
       "types": "./dist/client.d.ts",
       "import": "./dist/client.js",
-      "require": "./dist/client.cjs",
-      "source": "./src/client.ts"
+      "require": "./dist/client.cjs"
     },
     "./react": {
+      "source": "./src/react.ts",
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js",
-      "require": "./dist/react.cjs",
-      "source": "./src/react.ts"
+      "require": "./dist/react.cjs"
     },
     "./server": {
+      "source": "./src/server.ts",
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js",
-      "require": "./dist/server.cjs",
-      "source": "./src/server.ts"
+      "require": "./dist/server.cjs"
     }
   },
   "dependencies": {
