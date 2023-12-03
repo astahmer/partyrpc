@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { usePartyRPC } from "./hooks/usePartyRPC";
+import { usePartyMessage, useSocketEvent, client } from "./hooks/safe-party-client";
 
 function App() {
-  const { sendEvent, usePartyMessage, useSocketEvent } = usePartyRPC();
-  const [latencyMonitor, setLatencyMonitor] = useState<number | null>(null);
+  const [latencyMonitor, setLatencyMonitor] = useState<number>(0);
   const [counter, setCounter] = useState(0);
   const [latencyPingStarts, setLatencyPingStarts] = useState(new Map());
 
@@ -11,7 +10,8 @@ function App() {
     const interval = setInterval(() => {
       const id = crypto.randomUUID();
       latencyPingStarts.set(id, Date.now());
-      sendEvent({ type: "latency", id });
+
+      client.send({ type: "latency", id });
     }, 1000);
 
     return () => {
@@ -20,7 +20,7 @@ function App() {
   }, []);
 
   useSocketEvent("open", () => {
-    sendEvent({ type: "ping" });
+    client.send({ type: "ping" });
   });
 
   usePartyMessage("latency", (data) => {
@@ -30,6 +30,7 @@ function App() {
       latencyPingStarts.delete(data.id);
       return latencyPingStarts;
     });
+
     setLatencyMonitor(latency);
   });
 
@@ -38,7 +39,7 @@ function App() {
   });
 
   const handleAddToCounter = () => {
-    sendEvent({ type: "add-to-counter", amount: 5 });
+    client.send({ type: "add-to-counter", amount: 5 });
   };
 
   return (
@@ -47,7 +48,7 @@ function App() {
         Add 5 to counter ({counter})
       </button>
 
-      <div>{latencyMonitor !== null && `${latencyMonitor}ms`}</div>
+      <div>{latencyMonitor}ms</div>
     </>
   );
 }
