@@ -62,21 +62,23 @@ Bind it to your party server:
 
 ```ts
 // src/server.ts
-import type { PartyKitServer } from "partykit/server";
+import * as Party from "partykit/server";
 import { safeParty } from "./safe-party";
 
 // optional context
 const ctx = { counter: 0 };
 
-export default {
-  onConnect(ws, room) {
-    // ...
-    ws.addEventListener("message", (evt) => {
-      // simply use the safe party message handler
-      safeParty.onMessage(evt.data, ws, room, ctx);
+export default class Server implements Party.Server {
+  constructor(readonly party: Party.Party) {}
+
+  onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
+    conn.addEventListener("message", (evt) => {
+      safeParty.onMessage(evt.data, conn, this.party, userCtx);
     });
-  },
-};
+  }
+}
+
+Server satisfies Party.Worker;
 ```
 
 Finally, create your party client:

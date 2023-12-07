@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { usePartyMessage, useSocketEvent, client } from "./hooks/safe-party-client";
+import { usePartyMessage, useSocketEvent, client } from "./partykit/safe-party-client";
 
 function App() {
   const [latencyMonitor, setLatencyMonitor] = useState<number>(0);

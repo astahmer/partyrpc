@@ -64,11 +64,16 @@ type NoMatchingRouteResponse = {
   reason: "no matching route";
 };
 type UnexpectedErrorResponse = { type: "ws.error"; reason: "unexpected error" };
+type AnyErrorResponse = {
+  type: "ws.error";
+  reason: string;
+};
 type BasePartyResponses =
   | EmptyMessageResponse
   | InvalidMessageResponse
   | NoMatchingRouteResponse
-  | UnexpectedErrorResponse;
+  | UnexpectedErrorResponse
+  | AnyErrorResponse;
 
 export const createPartyRpc = <Responses, UserContext = {}>() => {
   const send: PartyResponseHelpers<Responses>["send"] = (ws, message) => ws.send(JSON.stringify(message));

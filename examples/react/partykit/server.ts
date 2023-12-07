@@ -1,10 +1,6 @@
 import * as Party from "partykit/server";
 import { safeParty } from "./safe-party";
 
-declare global {
-  const SOME_GLOBAL: string;
-}
-
 const userCtx = { counter: 0 };
 
 export default class Server implements Party.Server {
