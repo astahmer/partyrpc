@@ -41,7 +41,8 @@ export const safeParty = party.events({
   ping: {
     schema: v.never(),
     onMessage(message, ws, room, ctx) {
-      party.send(ws, { type: "pong", size: room.connections.size });
+      const connections = room.getConnections();
+      party.send(ws, { type: "pong", size: [...connections].length });
     },
   },
   latency: {
