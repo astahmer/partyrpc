@@ -57,7 +57,7 @@ export default class Server implements Party.Server {
   //   console.log(SOME_GLOBAL);
   //   return new Response("Hello world:" + req.headers.get("x-foo") + " " + room.id);
   // },
-  async onFetch(req, lobby, ctx) {
+  async onFetch(req: Party.Request, lobby: Party.FetchLobby, ctx: Party.ExecutionContext) {
     console.log("onFetch", req.url);
     // return new Response("unstable_onFetch:" + req.url);
     return router.onFetch(req, lobby, ctx, userCtx);
