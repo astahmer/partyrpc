@@ -1,4 +1,4 @@
-import type { PartyKitServer } from "partykit/server";
+import type * as Party from "partykit/server";
 import { router, safeParty } from "./safe-party";
 
 declare global {
@@ -7,18 +7,20 @@ declare global {
 
 const userCtx = { counter: 0 };
 
-export default {
-  onConnect(ws, room) {
-    console.log(room.env);
+export default class Server implements Party.Server {
+  constructor(readonly party: Party.Party) {}
+
+  onConnect(conn: Party.Connection, ctx: Party.ConnectionContext) {
+    console.log(this.party.env);
 
     console.log(process.env["WHATUP"]);
 
     console.log(SOME_GLOBAL);
     // your business logic here
-    ws.addEventListener("message", (evt) => {
-      safeParty.onMessage(evt.data, ws, room, userCtx);
+    conn.addEventListener("message", (evt) => {
+      safeParty.onMessage(evt.data, conn, this.party, userCtx);
     });
-  },
+  }
 
   // // onMessage(msg, conn, room) {
   // //   if (msg === "ping") {
@@ -59,5 +61,7 @@ export default {
     console.log("onFetch", req.url);
     // return new Response("unstable_onFetch:" + req.url);
     return router.onFetch(req, lobby, ctx, userCtx);
-  },
-} satisfies PartyKitServer;
+  }
+}
+
+Server satisfies Party.Worker;
