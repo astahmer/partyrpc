@@ -2,6 +2,12 @@
   "name": "partyrpc-monorepo",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "cd packages/partyrpc && pnpm build",
+    "release": "changeset publish",
+    "release-dev": "changeset version --snapshot dev && changeset publish --tag dev",
+    "test": "cd packages/partyrpc && pnpm run typecheck"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/astahmer/partyrpc.git"
