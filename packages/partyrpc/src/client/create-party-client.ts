@@ -120,7 +120,7 @@ export function createPartyClient<TEvents extends AnyEventMap, TResponses extend
 }
 
 export type PartyEventByType<Events extends AnyEventMap, TType extends keyof Events> = Events[TType]["schema"] extends
-  | v.NeverSchema
+  | v.NeverSchema<undefined>
   | never
   ? { type: TType }
   : Pretty<{ type: TType } & Infer<Events[TType]["schema"]>>;

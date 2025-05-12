@@ -38,7 +38,7 @@ export type AnyEventMap = {
 
 type EventItem<out TSchema, Key, in UserContext> = {
   schema: TSchema;
-  onMessage: Infer<TSchema> extends never | v.NeverSchema
+  onMessage: Infer<TSchema> extends never | v.NeverSchema<undefined>
     ? TypedHandler<{ type: Key }, UserContext>
     : TypedHandler<Pretty<Infer<TSchema> & { type: Key }>, UserContext>;
 };
@@ -96,7 +96,7 @@ export const createPartyRpc = <Responses, UserContext = {}>() => {
 
     const eventsMap = new Map<keyof TEvents, EventDefinition<keyof TEvents, unknown, UserContext>>(eventEntries as any);
     const types = Object.keys(events) as Array<keyof TEvents>;
-    const withType = v.object({ type: v.enumType(types as any) });
+    const withType = v.object({ type: v.enum(types as any) });
 
     const onMessage: TypedHandler<string | ArrayBuffer, UserContext> = async (msg, ws, room, ctx) => {
       const decoded = decode<unknown>(msg);
@@ -110,11 +110,11 @@ export const createPartyRpc = <Responses, UserContext = {}>() => {
         return send(ws, {
           type: "ws.error",
           reason: "invalid message",
-          _issues: parsed.error.issues.map(vIssuesToValidationIssues),
+          _issues: parsed.issues.map(vIssuesToValidationIssues),
         });
       }
 
-      const route = eventsMap.get(parsed.data.type);
+      const route = eventsMap.get(parsed.output.type);
       if (!route) {
         return send(ws, { type: "ws.error", reason: "no matching route" });
       }
