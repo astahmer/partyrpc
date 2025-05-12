@@ -1,0 +1,5 @@
+---
+"partyrpc": minor
+---
+
+upgrade deps
