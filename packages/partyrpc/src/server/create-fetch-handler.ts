@@ -73,7 +73,7 @@ export function createFetchHandler<const TEndpoints extends readonly AnyEndpoint
   return {
     onFetch(req, lobby, ctx, userCtx) {
       return router
-        .handle(req, lobby, ctx, userCtx)
+        .fetch(req, lobby, ctx, userCtx)
         .then(json)
         .catch(() => {
           return new Response("Internal server error", { status: 500 });
