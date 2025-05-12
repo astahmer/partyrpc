@@ -1,7 +1,7 @@
-name: Release
+name: Pull request check
 
 on:
-  push:
+  pull_request:
     branches:
       - main
 
@@ -9,7 +9,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   release:
-    name: Release
+    name: Pull request check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
@@ -33,12 +33,3 @@ jobs:
 
       - name: Test
         run: pnpm test
-
-      - name: Create Release Pull Request or Publish to npm
-        id: changesets
-        uses: changesets/action@v1
-        with:
-          publish: pnpm release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
